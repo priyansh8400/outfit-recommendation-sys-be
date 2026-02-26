@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model raw_products {
+  id           String   @id @default(uuid()) @db.Uuid
+  source       String
+  title        String
+  description  String?
+  image_url    String
+  product_url  String   @unique
+  raw_category String
+  raw_gender   String
+  processed    Boolean  @default(false)
+  created_at   DateTime @default(now())
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum Category {
+  top
+  bottom
+  shoes
+}
+
+model clothes {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(255)
+  gender       Gender
+  category     Category
+  sub_category String   @db.VarChar(255)
+  image_url    String
+  color        String?  @db.VarChar(255)
+  brand        String?  @db.VarChar(255)
+  created_at   DateTime @default(now())
+
+  // Relations
+  outfits_top    outfit[] @relation("OutfitTop")
+  outfits_bottom outfit[] @relation("OutfitBottom")
+  outfits_shoes  outfit[] @relation("OutfitShoes")
+}
+
+model person {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  gender    Gender
+  image_url String
+
+  // Relations
+  outfits   outfit[]
+}
+
+model outfit {
+  id        String @id @default(uuid()) @db.Uuid
+  person_id String @db.Uuid
+  top_id    String @db.Uuid
+  bottom_id String @db.Uuid
+  shoes_id  String @db.Uuid
+
+  person person  @relation(fields: [person_id], references: [id], onDelete: Cascade)
+  top    clothes @relation("OutfitTop", fields: [top_id], references: [id])
+  bottom clothes @relation("OutfitBottom", fields: [bottom_id], references: [id])
+  shoes  clothes @relation("OutfitShoes", fields: [shoes_id], references: [id])
+}
