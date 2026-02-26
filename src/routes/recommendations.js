@@ -28,15 +28,13 @@ router.get('/', async (req, res) => {
             };
         }
 
-        const recommendations = await prisma.clothes.findMany({
-            where: whereClause,
-            take: parseInt(limit, 10),
-            // order by random if we want varied results, but Prisma doesn't support random natively well. 
-            // We will just order by created_at desc for now.
-            orderBy: {
-                created_at: 'desc'
-            }
+        const allMatching = await prisma.clothes.findMany({
+            where: whereClause
         });
+
+        // Randomly shuffle the results
+        const shuffled = allMatching.sort(() => 0.5 - Math.random());
+        const recommendations = shuffled.slice(0, parseInt(limit, 10));
 
         res.json(recommendations);
     } catch (error) {

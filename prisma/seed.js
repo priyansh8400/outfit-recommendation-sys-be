@@ -2,17 +2,40 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const personsData = [
-    { name: 'Alex', gender: 'male', image_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&q=80' },
-    { name: 'Sarah', gender: 'female', image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80' },
-    { name: 'Mike', gender: 'male', image_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80' },
-    { name: 'Emily', gender: 'female', image_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&q=80' },
-    { name: 'David', gender: 'male', image_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&q=80' },
+    { name: 'Robert', gender: 'male', image_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&q=80' },
+    { name: 'Sophia', gender: 'female', image_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=80' }
 ];
+
+const outfitPlans = {
+    'Robert': [
+        { type: 'regular', topColor: 'white', bottomColor: 'blue', image_url: 'https://images.unsplash.com/photo-1516826957135-700ede19f694?w=800&q=80' },
+        { type: 'regular', topColor: 'black', bottomColor: 'black', image_url: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800&q=80' },
+        { type: 'regular', topColor: 'grey', bottomColor: 'grey', image_url: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800&q=80' },
+        { type: 'regular', topColor: 'blue', bottomColor: 'beige', image_url: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&q=80' },
+        { type: 'regular', topColor: 'white', bottomColor: 'black', image_url: 'https://images.unsplash.com/photo-1594938298596-ec6549298419?w=800&q=80' }
+    ],
+    'Sophia': [
+        { type: 'dress', topColor: 'yellow', bottomColor: '', image_url: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80' },
+        { type: 'regular', topColor: 'yellow', bottomColor: 'blue', image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80' },
+        { type: 'regular', topColor: 'brown', bottomColor: 'black', image_url: 'https://images.unsplash.com/photo-1550614000-4b95d466e855?w=800&q=80' },
+        { type: 'regular', topColor: 'grey', bottomColor: 'grey', image_url: 'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?w=800&q=80' },
+        { type: 'regular', topColor: 'grey', bottomColor: 'black', image_url: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=800&q=80' }
+    ]
+};
+
+function findBestMatch(items, colorWord) {
+    if (!items || items.length === 0) return null;
+    let match = items.find(i => (i.color && i.color.toLowerCase().includes(colorWord)) || (i.name && i.name.toLowerCase().includes(colorWord)));
+    if (!match) {
+        match = items[Math.floor(Math.random() * items.length)];
+    }
+    return match;
+}
 
 async function main() {
     console.log('Seeding persons...');
 
-    // Clear existing persons and outfits (cascade will handle outfits if set, but we'll do it cleanly)
+    // Clear existing persons and outfits
     await prisma.outfit.deleteMany({});
     await prisma.person.deleteMany({});
 
@@ -24,29 +47,69 @@ async function main() {
 
         console.log(`Created person: ${person.name} (${person.gender})`);
 
-        // 2. Find random clothes for this person's gender
-        const tops = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'top' } });
-        const bottoms = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'bottom' } });
-        const shoesList = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'shoes' } });
+        // 2. Fetch all clothes for this gender
+        let tops = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'top' } });
+        let bottoms = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'bottom' } });
+        let shoesList = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'shoes' } });
+        let dresses = await prisma.clothes.findMany({ where: { gender: person.gender, category: 'dress' } });
 
-        if (tops.length > 0 && bottoms.length > 0 && shoesList.length > 0) {
-            // Pick random items
-            const randomTop = tops[Math.floor(Math.random() * tops.length)];
-            const randomBottom = bottoms[Math.floor(Math.random() * bottoms.length)];
-            const randomShoes = shoesList[Math.floor(Math.random() * shoesList.length)];
+        // Fallback dummy items if the scraper hasn't finished yet
+        if (tops.length === 0) {
+            tops.push(await prisma.clothes.create({ data: { name: 'Basic Top', gender: person.gender, category: 'top', sub_category: 't-shirt', image_url: 'https://placehold.co/400x600/EEE/31343C?text=Top', price: 999 } }));
+        }
+        if (bottoms.length === 0) {
+            bottoms.push(await prisma.clothes.create({ data: { name: 'Classic Bottom', gender: person.gender, category: 'bottom', sub_category: 'jeans', image_url: 'https://placehold.co/400x600/EEE/31343C?text=Bottom', price: 1499 } }));
+        }
+        if (shoesList.length === 0) {
+            shoesList.push(await prisma.clothes.create({ data: { name: 'Comfort Shoes', gender: person.gender, category: 'shoes', sub_category: 'sneakers', image_url: 'https://placehold.co/400x600/EEE/31343C?text=Shoes', price: 2499 } }));
+        }
+        if (dresses.length === 0 && person.gender === 'female') {
+            dresses.push(await prisma.clothes.create({ data: { name: 'Elegant Dress', gender: person.gender, category: 'dress', sub_category: 'midi', image_url: 'https://placehold.co/400x600/EEE/31343C?text=Dress', price: 3999 } }));
+        }
 
-            // 3. Create Outfit
-            await prisma.outfit.create({
-                data: {
-                    person_id: person.id,
-                    top_id: randomTop.id,
-                    bottom_id: randomBottom.id,
-                    shoes_id: randomShoes.id,
-                },
-            });
-            console.log(`  -> Created outfit for ${person.name}`);
-        } else {
-            console.log(`  -> Could not create outfit for ${person.name} due to missing clothing data in DB for gender: ${person.gender}. Make sure scraper has populated products.`);
+        const plans = outfitPlans[person.name];
+
+        for (let i = 0; i < plans.length; i++) {
+            const plan = plans[i];
+            try {
+                if (plan.type === 'dress' && dresses.length > 0) {
+                    const dress = findBestMatch(dresses, plan.topColor);
+                    const shoes = shoesList[Math.floor(Math.random() * shoesList.length)];
+
+                    if (dress && shoes) {
+                        await prisma.outfit.create({
+                            data: {
+                                person_id: person.id,
+                                dress_id: dress.id,
+                                shoes_id: shoes.id,
+                                image_url: plan.image_url
+                            }
+                        });
+                        console.log(`  -> Created outfit ${i + 1} (Dress) for ${person.name}`);
+                    }
+                } else {
+                    const top = findBestMatch(tops, plan.topColor);
+                    const bottom = findBestMatch(bottoms, plan.bottomColor);
+                    const shoes = shoesList[Math.floor(Math.random() * shoesList.length)];
+
+                    if (top && bottom && shoes) {
+                        await prisma.outfit.create({
+                            data: {
+                                person_id: person.id,
+                                top_id: top.id,
+                                bottom_id: bottom.id,
+                                shoes_id: shoes.id,
+                                image_url: plan.image_url
+                            }
+                        });
+                        console.log(`  -> Created outfit ${i + 1} (Regular) for ${person.name}`);
+                    } else {
+                        console.log(`  -> Missing regular clothing data for ${person.name} on outfit ${i + 1}`);
+                    }
+                }
+            } catch (err) {
+                console.error(`  -> Failed creating outfit ${i + 1} for ${person.name}`, err);
+            }
         }
     }
 

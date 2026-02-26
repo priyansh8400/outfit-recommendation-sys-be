@@ -3,10 +3,18 @@ const prisma = require('../lib/prisma');
 
 const router = express.Router();
 
-// GET /persons - Returns list of homepage models
+// GET /persons - Returns list of homepage models (optional ?gender=male|female)
 router.get('/', async (req, res) => {
     try {
-        const persons = await prisma.person.findMany();
+        const { gender } = req.query;
+        let whereClause = {};
+        if (gender === 'male' || gender === 'female') {
+            whereClause.gender = gender;
+        }
+
+        const persons = await prisma.person.findMany({
+            where: whereClause
+        });
         res.json(persons);
     } catch (error) {
         console.error('Error fetching persons:', error);
@@ -14,8 +22,9 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /persons/:id/outfit - Returns person + worn clothes
-router.get('/:id/outfit', async (req, res) => {
+// GET /persons/:id/outfit - Deprecated/Replaced, but can stay for backwards compat.
+// Adding GET /persons/:id/outfits to return ALL outfits for a persona
+router.get('/:id/outfits', async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -26,7 +35,8 @@ router.get('/:id/outfit', async (req, res) => {
                     include: {
                         top: true,
                         bottom: true,
-                        shoes: true
+                        shoes: true,
+                        dress: true
                     }
                 }
             }
@@ -36,17 +46,27 @@ router.get('/:id/outfit', async (req, res) => {
             return res.status(404).json({ error: 'Person not found' });
         }
 
-        // Format response to return person details and their current outfit
-        const currentOutfit = person.outfits[0] || null;
-        let wearing = null;
-
-        if (currentOutfit) {
-            wearing = {
-                top: currentOutfit.top,
-                bottom: currentOutfit.bottom,
-                shoes: currentOutfit.shoes
-            };
-        }
+        const formattedOutfits = person.outfits.map(outfit => {
+            const isDressOutfit = !!outfit.dress;
+            if (isDressOutfit) {
+                return {
+                    id: outfit.id,
+                    outfitType: "dress",
+                    image_url: outfit.image_url,
+                    dress: outfit.dress,
+                    shoes: outfit.shoes
+                };
+            } else {
+                return {
+                    id: outfit.id,
+                    outfitType: "regular",
+                    image_url: outfit.image_url,
+                    top: outfit.top,
+                    bottom: outfit.bottom,
+                    shoes: outfit.shoes
+                };
+            }
+        });
 
         res.json({
             person: {
@@ -55,11 +75,11 @@ router.get('/:id/outfit', async (req, res) => {
                 gender: person.gender,
                 image_url: person.image_url
             },
-            wearing
+            outfits: formattedOutfits
         });
 
     } catch (error) {
-        console.error(`Error fetching outfit for person ${req.params.id}:`, error);
+        console.error(`Error fetching outfits for person ${req.params.id}:`, error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
