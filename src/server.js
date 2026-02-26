@@ -10,6 +10,7 @@ app.use(express.json());
 
 const personsRouter = require('./routes/persons');
 const recommendationsRouter = require('./routes/recommendations');
+const outfitRouter = require('./routes/outfit');
 
 // Health Check API
 app.get('/health', (req, res) => {
@@ -18,6 +19,7 @@ app.get('/health', (req, res) => {
 
 app.use('/persons', personsRouter);
 app.use('/recommendations', recommendationsRouter);
+app.use('/outfit', outfitRouter);
 
 app.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
